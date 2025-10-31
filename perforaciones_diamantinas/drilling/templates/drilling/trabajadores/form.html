@@ -1,0 +1,157 @@
+{% extends 'drilling/base.html' %}
+
+{% block title %}
+{% if object %}Editar Trabajador{% else %}Nuevo Trabajador{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h4>
+                    {% if object %}
+                        <i class="fas fa-edit"></i> Editar Trabajador: {{ object.nombre }}
+                    {% else %}
+                        <i class="fas fa-plus"></i> Nuevo Trabajador
+                    {% endif %}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="{{ form.nombres.id_for_label }}" class="form-label">
+                                        <i class="fas fa-user"></i> Nombres *
+                                    </label>
+                                    {{ form.nombres }}
+                                    {% if form.nombres.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.nombres.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.cargo.id_for_label }}" class="form-label">
+                                    <i class="fas fa-briefcase"></i> Cargo *
+                                </label>
+                                {{ form.cargo }}
+                                {% if form.cargo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.cargo.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.apellidos.id_for_label }}" class="form-label">
+                                    <i class="fas fa-id-badge"></i> Apellidos
+                                </label>
+                                {{ form.apellidos }}
+                                {% if form.apellidos.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.apellidos.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.dni.id_for_label }}" class="form-label">
+                                    <i class="fas fa-id-card"></i> DNI
+                                </label>
+                                {{ form.dni }}
+                                {% if form.dni.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.dni.errors.0 }}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Documento de identidad</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.telefono.id_for_label }}" class="form-label">
+                                    <i class="fas fa-phone"></i> Teléfono
+                                </label>
+                                {{ form.telefono }}
+                                {% if form.telefono.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.telefono.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.fecha_ingreso.id_for_label }}" class="form-label">
+                                    <i class="fas fa-calendar"></i> Fecha de Ingreso
+                                </label>
+                                {{ form.fecha_ingreso }}
+                                {% if form.fecha_ingreso.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.fecha_ingreso.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="{{ form.email.id_for_label }}" class="form-label">
+                                    <i class="fas fa-envelope"></i> Email
+                                </label>
+                                {{ form.email }}
+                                {% if form.email.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.email.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if object %}
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <div class="form-check form-switch mt-4">
+                                    {{ form.is_active }}
+                                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                        <i class="fas fa-toggle-on"></i> Trabajador Activo
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'trabajador-list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Volver
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i>
+                            {% if object %}Actualizar{% else %}Crear{% endif %} Trabajador
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
