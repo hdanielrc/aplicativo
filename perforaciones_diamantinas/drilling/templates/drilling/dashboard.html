@@ -89,40 +89,28 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-2">
+                    <div class="col-md-3">
+                        <a href="{% url 'sondaje-list' %}" class="btn btn-dark w-100 mb-2">
+                            <i class="fas fa-map-marked-alt"></i><br>
+                            <small>Sondajes</small>
+                        </a>
+                    </div>
+                    <div class="col-md-3">
                         <a href="{% url 'crear-turno-completo' %}" class="btn btn-primary w-100 mb-2">
                             <i class="fas fa-plus-circle"></i><br>
                             <small>Nuevo Turno</small>
                         </a>
                     </div>
-                    <div class="col-md-2">
-                        <a href="{% url 'abastecimiento-list' %}" class="btn btn-success w-100 mb-2">
-                            <i class="fas fa-truck"></i><br>
-                            <small>Abastecimiento</small>
-                        </a>
-                    </div>
-                    <div class="col-md-2">
-                        <a href="{% url 'importar-abastecimiento' %}" class="btn btn-warning w-100 mb-2">
-                            <i class="fas fa-file-excel"></i><br>
-                            <small>Importar Excel</small>
-                        </a>
-                    </div>
-                    <div class="col-md-2">
-                        <a href="{% url 'stock-disponible' %}" class="btn btn-info w-100 mb-2">
-                            <i class="fas fa-warehouse"></i><br>
-                            <small>Stock</small>
-                        </a>
-                    </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <a href="{% url 'trabajador-list' %}" class="btn btn-secondary w-100 mb-2">
                             <i class="fas fa-users"></i><br>
                             <small>Trabajadores</small>
                         </a>
                     </div>
-                    <div class="col-md-2">
-                        <a href="{% url 'sondaje-list' %}" class="btn btn-dark w-100 mb-2">
-                            <i class="fas fa-map-marked-alt"></i><br>
-                            <small>Sondajes</small>
+                    <div class="col-md-3">
+                        <a href="{% url 'maquina-list' %}" class="btn btn-info w-100 mb-2">
+                            <i class="fas fa-industry"></i><br>
+                            <small>Máquinas</small>
                         </a>
                     </div>
                 </div>
@@ -145,7 +133,7 @@
                         <thead>
                             <tr>
                                 <th>Fecha</th>
-                                <th>Sondaje</th>
+                                <th>Sondaje(s)</th>
                                 <th>Turno</th>
                                 <th>Estado</th>
                             </tr>
@@ -154,7 +142,17 @@
                             {% for turno in ultimos_turnos %}
                             <tr>
                                 <td>{{ turno.fecha|date:"d/m" }}</td>
-                                <td>{{ turno.sondaje.nombre_sondaje }}</td>
+                                        <td>
+                                            {% with turno.sondajes.all as s_list %}
+                                                {% if s_list %}
+                                                    {% for s in s_list %}
+                                                        {{ s.nombre_sondaje }}{% if not forloop.last %}, {% endif %}
+                                                    {% endfor %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
                                 <td>{{ turno.tipo_turno.nombre }}</td>
                                 <td>
                                     <span class="badge {% if turno.estado == 'COMPLETADO' %}bg-success{% elif turno.estado == 'BORRADOR' %}bg-warning{% elif turno.estado == 'APROBADO' %}bg-primary{% else %}bg-secondary{% endif %}">

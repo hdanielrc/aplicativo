@@ -449,7 +449,9 @@ class Trabajador(models.Model):
     nombres = models.CharField(max_length=200)
     apellidos = models.CharField(max_length=200, blank=True)
     cargo = models.CharField(max_length=30, choices=CARGO_CHOICES)
-    dni = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    # `dni` debe ser único y no nulo; mantenemos la columna `id` como PK
+    # para evitar romper relaciones existentes en la base de datos.
+    dni = models.CharField(max_length=20, unique=True)
     telefono = models.CharField(max_length=15, blank=True)
     email = models.EmailField(blank=True)
     fecha_ingreso = models.DateField(null=True, blank=True)
@@ -459,7 +461,11 @@ class Trabajador(models.Model):
 
     class Meta:
         db_table = 'trabajadores'
-    unique_together = ['contrato', 'dni']
+        # Cuando 'dni' es PK global, no es necesaria una constraint ('contrato','dni')
+        # unique_together se elimina para evitar duplicación de restricciones.
+
+    # Usar 'dni' como clave primaria para identificar al trabajador
+    # (se establece más abajo como primary_key=True)
 
     def __str__(self):
         return f"{self.nombres} {self.apellidos or ''} - {self.get_cargo_display()}"
@@ -471,6 +477,8 @@ class Turno(models.Model):
         ('APROBADO', 'Aprobado'),
     ]
     
+    # Relación directa con contrato (requerida para integridad)
+    contrato = models.ForeignKey(Contrato, on_delete=models.PROTECT, related_name='turnos')
     # Un turno puede ahora estar asociado a uno o varios sondajes.
     # Usamos un modelo intermedio `TurnoSondaje` (through) para permitir
     # extender la relación en el futuro con datos por sondaje si es necesario.
@@ -484,11 +492,28 @@ class Turno(models.Model):
 
     class Meta:
         db_table = 'turnos'
-    # Ajuste: la unicidad ahora se mantiene por máquina/fecha/tipo_turno.
-    # La asociación sondaje->turno es M2M, por lo que no formará parte
-    # de esta constraint. Esto evita duplicados de turno para la misma
-    # máquina/fecha/tipo.
-    unique_together = ['maquina', 'fecha', 'tipo_turno']
+        verbose_name = 'Turno'
+        verbose_name_plural = 'Turnos'
+        # Constraint: un turno es único por contrato, máquina, fecha y tipo_turno
+        # Esto asegura que no haya turnos duplicados para la misma máquina en el mismo día
+        unique_together = ['contrato', 'maquina', 'fecha', 'tipo_turno']
+        indexes = [
+            models.Index(fields=['contrato', 'fecha']),
+            models.Index(fields=['maquina', 'fecha']),
+        ]
+
+    def clean(self):
+        """Validaciones personalizadas del modelo"""
+        # Validar que máquina pertenece al mismo contrato
+        if self.maquina and self.maquina.contrato != self.contrato:
+            raise ValidationError(
+                'La máquina seleccionada no pertenece al contrato del turno'
+            )
+
+    def save(self, *args, **kwargs):
+        """Override save para aplicar validaciones"""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         try:
@@ -537,6 +562,20 @@ class TurnoSondaje(models.Model):
         db_table = 'turno_sondaje'
         unique_together = ['turno', 'sondaje']
 
+    def clean(self):
+        """Validaciones personalizadas del modelo"""
+        # Validar que el sondaje pertenece al mismo contrato del turno
+        if self.sondaje and self.turno and self.sondaje.contrato != self.turno.contrato:
+            raise ValidationError(
+                f'El sondaje "{self.sondaje.nombre_sondaje}" no pertenece al contrato del turno. '
+                f'Sondaje contrato: {self.sondaje.contrato}, Turno contrato: {self.turno.contrato}'
+            )
+
+    def save(self, *args, **kwargs):
+        """Override save para aplicar validaciones"""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Turno {self.turno_id} - Sondaje {self.sondaje_id}"
 
@@ -557,9 +596,13 @@ class TurnoMaquina(models.Model):
     ]
     
     turno = models.OneToOneField(Turno, on_delete=models.CASCADE, related_name='maquina_estado')
+    # Horas expresadas como lectura de horómetro (contador) o como time. Preferimos
+    # usar las lecturas de horómetro cuando están disponibles (horometro_inicio/fin).
     hora_inicio = models.TimeField(null=True, blank=True)
     hora_fin = models.TimeField(null=True, blank=True)
-    horas_trabajadas_calc = models.DecimalField(max_digits=4, decimal_places=2, editable=False)
+    horometro_inicio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    horometro_fin = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    horas_trabajadas_calc = models.DecimalField(max_digits=10, decimal_places=2, editable=False, default=0)
     estado_bomba = models.CharField(max_length=20, choices=ESTADO_CHOICES)
     estado_unidad = models.CharField(max_length=20, choices=ESTADO_CHOICES)
     estado_rotacion = models.CharField(max_length=20, choices=ESTADO_CHOICES)
@@ -570,22 +613,32 @@ class TurnoMaquina(models.Model):
     def save(self, *args, **kwargs):
         from datetime import datetime, timedelta
 
-        # Si no hay horas, evitar llamar a datetime.combine con None
+        # Priorizar cálculo a partir de lecturas de horómetro (si se proporcionaron)
+        try:
+            if self.horometro_inicio is not None and self.horometro_fin is not None:
+                # Horómetro representa un contador; la diferencia es la cantidad a sumar
+                try:
+                    self.horas_trabajadas_calc = Decimal(self.horometro_fin) - Decimal(self.horometro_inicio)
+                except Exception:
+                    self.horas_trabajadas_calc = Decimal('0')
+                return super().save(*args, **kwargs)
+        except Exception:
+            # Caer a cálculo por tiempo si algo falla
+            pass
+
+        # Si no hay lecturas de horómetro completas, intentar calcular desde times
         if not self.hora_inicio or not self.hora_fin:
-            # No se puede calcular, dejar en 0.00
             try:
                 self.horas_trabajadas_calc = Decimal('0')
             except Exception:
                 self.horas_trabajadas_calc = 0
             return super().save(*args, **kwargs)
 
-        # Ambos tiempos presentes, calcular horas trabajadas
+        # Ambos tiempos presentes, calcular horas trabajadas (horas decimales)
         inicio = datetime.combine(datetime.today(), self.hora_inicio)
         fin = datetime.combine(datetime.today(), self.hora_fin)
-        
         if fin < inicio:
             fin += timedelta(days=1)
-        
         diff = fin - inicio
         self.horas_trabajadas_calc = Decimal(str(diff.total_seconds() / 3600))
         super().save(*args, **kwargs)
@@ -602,7 +655,17 @@ class TurnoComplemento(models.Model):
     class Meta:
         db_table = 'turno_complemento'
 
+    def clean(self):
+        """Validaciones personalizadas"""
+        if self.sondaje and self.turno:
+            if self.sondaje.contrato != self.turno.contrato:
+                raise ValidationError(
+                    f'El sondaje no pertenece al contrato del turno. '
+                    f'Sondaje contrato: {self.sondaje.contrato}, Turno contrato: {self.turno.contrato}'
+                )
+
     def save(self, *args, **kwargs):
+        self.full_clean()
         self.metros_turno_calc = self.metros_fin - self.metros_inicio
         super().save(*args, **kwargs)
 
@@ -615,6 +678,19 @@ class TurnoAditivo(models.Model):
 
     class Meta:
         db_table = 'turno_aditivo'
+
+    def clean(self):
+        """Validaciones personalizadas"""
+        if self.sondaje and self.turno:
+            if self.sondaje.contrato != self.turno.contrato:
+                raise ValidationError(
+                    f'El sondaje no pertenece al contrato del turno. '
+                    f'Sondaje contrato: {self.sondaje.contrato}, Turno contrato: {self.turno.contrato}'
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 class TurnoCorrida(models.Model):
     turno = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name='corridas')

@@ -118,15 +118,18 @@
             <div class="row">
                 <div class="col-md-2">
                     <div class="mb-3">
-                        <label for="hora_inicio_maq" class="form-label">Hora Inicio</label>
-                        <input type="time" id="hora_inicio_maq" name="hora_inicio_maq" class="form-control">
+                        <label for="hora_inicio_maq" class="form-label">Horómetro Inicio</label>
+                        <input type="number" id="hora_inicio_maq" name="hora_inicio_maq" class="form-control" step="0.01" min="0" placeholder="Ej: 1200">
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="mb-3">
-                        <label for="hora_fin_maq" class="form-label">Hora Fin</label>
-                        <input type="time" id="hora_fin_maq" name="hora_fin_maq" class="form-control">
+                        <label for="hora_fin_maq" class="form-label">Horómetro Fin</label>
+                        <input type="number" id="hora_fin_maq" name="hora_fin_maq" class="form-control" step="0.01" min="0" placeholder="Ej: 1206">
                     </div>
+                </div>
+                <div class="col-12">
+                    <small class="text-muted">Ingrese las lecturas de horómetro (ej. 1200 y 1206). La diferencia se sumará al contador <code>horometro</code> de la máquina al guardar el turno.</small>
                 </div>
                 <div class="col-md-2">
                     <div class="mb-3">
@@ -162,12 +165,12 @@
         </div>
     </div>
 
-    <!-- Complementos -->
+    <!-- Productos Diamantados -->
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5><i class="fas fa-puzzle-piece"></i> Complementos</h5>
+            <h5><i class="fas fa-puzzle-piece"></i> Productos Diamantados</h5>
             <div>
-                <small class="text-muted">Los complementos se asignan por sondaje. Añada sondajes arriba para mostrar subsecciones.</small>
+                <small class="text-muted">Los productos diamantados se asignan por sondaje. Añada sondajes arriba para mostrar subsecciones.</small>
             </div>
         </div>
         <div class="card-body">
@@ -265,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <select name="trabajador_${trabajadorCount}" class="form-select" required>
                         <option value="">Seleccionar trabajador</option>
                         {% for trabajador in trabajadores %}
-                        <option value="{{ trabajador.id }}">{{ trabajador.apellidos }}, {{ trabajador.nombres }}{% if trabajador.dni %} - {{ trabajador.dni }}{% endif %} - {{ trabajador.get_cargo_display }}</option>
+                        <option value="{{ trabajador.dni }}">{{ trabajador.apellidos }}, {{ trabajador.nombres }}{% if trabajador.dni %} - {{ trabajador.dni }}{% endif %} - {{ trabajador.get_cargo_display }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -313,9 +316,9 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="complemento-row border rounded p-3 mb-3 bg-light">
             <div class="row">
                 <div class="col-md-3">
-                    <label class="form-label">Tipo de Complemento</label>
+                    <label class="form-label">Tipo de Producto Diamantado</label>
                     <select name="tipo_complemento_${complementoCount}" class="form-select" required>
-                        <option value="">Seleccionar complemento</option>
+                        <option value="">Seleccionar producto diamantado</option>
                         {% for complemento in tipos_complemento %}
                         <option value="{{ complemento.id }}">{{ complemento.nombre }}</option>
                         {% endfor %}
@@ -488,11 +491,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Create subsections for new sondajes
         current.forEach(function(s){
-            if (!existingComp[s.id]){
+                if (!existingComp[s.id]){
                 const div = document.createElement('div');
                 div.className = 'complemento-subsection mb-3 border rounded p-2';
                 div.dataset.sondajeId = s.id;
-                div.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-2"><strong>Complementos para: ${s.text}</strong><button type="button" class="btn btn-sm btn-primary btn-add-complemento" data-sondaje-id="${s.id}"><i class="fas fa-plus"></i> Agregar Complemento</button></div><div class="complementos-list"></div>`;
+                    div.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-2"><strong>Productos Diamantados para: ${s.text}</strong><button type="button" class="btn btn-sm btn-primary btn-add-complemento" data-sondaje-id="${s.id}"><i class="fas fa-plus"></i> Agregar Producto Diamantado</button></div><div class="complementos-list"></div>`;
                 complementosCont.appendChild(div);
             }
             if (!existingAdit[s.id]){
@@ -506,7 +509,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (existingComp[s.id]){
                 try{
                     const header = existingComp[s.id].querySelector('strong');
-                    if (header) header.textContent = 'Complementos para: ' + s.text;
+                    if (header) header.textContent = 'Productos Diamantados para: ' + s.text;
                 }catch(e){ }
             }
             if (existingAdit[s.id]){
@@ -558,9 +561,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <input type="hidden" name="comp_sondaje_id_${idx}" value="${sondajeId}" class="comp-sondaje-id">
             <div class="row">
                 <div class="col-md-4">
-                    <label class="form-label">Tipo de Complemento</label>
+                    <label class="form-label">Tipo de Producto Diamantado</label>
                     <select name="tipo_complemento_${idx}" class="form-select" required>
-                        <option value="">Seleccionar complemento</option>
+                        <option value="">Seleccionar producto diamantado</option>
                         {% for complemento in tipos_complemento %}
                         <option value="{{ complemento.id }}">{{ complemento.nombre }}</option>
                         {% endfor %}
@@ -904,6 +907,31 @@ document.addEventListener('DOMContentLoaded', function() {
     // =============================================
     
     document.getElementById('form-turno').addEventListener('submit', function(e) {
+        // Validación cliente: horómetro numeric y horómetro fin >= inicio
+        try {
+            const hIniEl = document.getElementById('hora_inicio_maq');
+            const hFinEl = document.getElementById('hora_fin_maq');
+            if (hIniEl && hFinEl) {
+                const hi = hIniEl.value;
+                const hf = hFinEl.value;
+                if (hi !== '' && hf !== '') {
+                    const hiNum = parseFloat(hi);
+                    const hfNum = parseFloat(hf);
+                    if (isNaN(hiNum) || isNaN(hfNum)) {
+                        e.preventDefault();
+                        alert('Por favor ingrese valores numéricos válidos para Horómetro Inicio/Fin.');
+                        return;
+                    }
+                    if (hfNum < hiNum) {
+                        e.preventDefault();
+                        alert('Horómetro Fin debe ser mayor o igual que Horómetro Inicio.');
+                        return;
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('Validación de horómetro falló:', err);
+        }
         // VALIDACIÓN: para cada sondaje que tenga complementos o aditivos, exigir metraje > 0
         try {
             const sondajeRows = Array.from(document.querySelectorAll('.sondaje-row'));
@@ -923,7 +951,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const metVal = metInput ? metInput.value : '';
                     if (metVal === '' || isNaN(parseFloat(metVal)) || parseFloat(metVal) <= 0) {
                         e.preventDefault();
-                        alert('El sondaje "' + (sondajeText || sondajeId) + '" tiene complementos/aditivos asociados pero no tiene metraje válido. Por favor indique el metraje (mayor que 0) en esa fila antes de guardar.');
+                        alert('El sondaje "' + (sondajeText || sondajeId) + '" tiene productos diamantados/aditivos asociados pero no tiene metraje válido. Por favor indique el metraje (mayor que 0) en esa fila antes de guardar.');
                         return;
                     }
                 }

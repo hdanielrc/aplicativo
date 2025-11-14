@@ -565,10 +565,12 @@ def crear_turno_completo(request, pk=None):
                 messages.error(request, "Faltan campos requeridos: sondaje(s), máquina, tipo de turno y fecha.")
                 return redirect('crear-turno-completo')
 
-            # Obtener objetos relacionados
-            sondajes_qs = Sondaje.objects.filter(id__in=[int(x) for x in sondaje_ids])
-            sondajes_list = list(sondajes_qs)
-            if not sondajes_list or len(sondajes_list) != len(set(int(x) for x in sondaje_ids)):
+            # Obtener objetos relacionados EN EL MISMO ORDEN en que fueron seleccionados
+            sondajes_list = []
+            try:
+                for sid in sondaje_ids:
+                    sondajes_list.append(Sondaje.objects.get(id=int(sid)))
+            except (ValueError, Sondaje.DoesNotExist):
                 messages.error(request, 'Sondaje(s) seleccionado(s) inválido(s)')
                 return redirect('crear-turno-completo')
             # Para compatibilidad con el código existente que usa una única variable 'sondaje',
@@ -606,7 +608,7 @@ def crear_turno_completo(request, pk=None):
                             messages.warning(request, 'Trabajador con datos incompletos será omitido')
                             continue
                         trabajadores_parsed.append({
-                            'trabajador_id': int(t['trabajador_id']),
+                            'trabajador_id': t['trabajador_id'],
                             'funcion': t['funcion'],
                             'observaciones': t.get('observaciones', '')
                         })
@@ -716,11 +718,32 @@ def crear_turno_completo(request, pk=None):
                     # Si algún valor no es numérico, ignoramos el avance calculado
                     messages.warning(request, 'Algunos metrajes por sondaje no son numéricos; avance será 0 o calculado desde TurnoSondaje')
 
-            # Procesar datos de máquina con conversión de horas (pre-parseo)
+            # Procesar datos de máquina: aceptamos lecturas de horómetro (numéricas)
+            # o tiempos en formato HH:MM. Si el valor es numérico será tratado como
+            # lectura de horómetro (horometro_inicio/horometro_fin).
             hora_inicio_maq = request.POST.get('hora_inicio_maq')
             hora_fin_maq = request.POST.get('hora_fin_maq')
-            hora_inicio_maq_parsed = convert_to_time(hora_inicio_maq) if hora_inicio_maq else None
-            hora_fin_maq_parsed = convert_to_time(hora_fin_maq) if hora_fin_maq else None
+            hora_inicio_maq_parsed = None
+            hora_fin_maq_parsed = None
+            horometro_inicio_val = None
+            horometro_fin_val = None
+            # Intentar parsear como Decimal (horómetro)
+            from decimal import Decimal, InvalidOperation
+            try:
+                if hora_inicio_maq is not None and hora_inicio_maq.strip() != '':
+                    try:
+                        horometro_inicio_val = Decimal(hora_inicio_maq)
+                    except Exception:
+                        hora_inicio_maq_parsed = convert_to_time(hora_inicio_maq)
+                if hora_fin_maq is not None and hora_fin_maq.strip() != '':
+                    try:
+                        horometro_fin_val = Decimal(hora_fin_maq)
+                    except Exception:
+                        hora_fin_maq_parsed = convert_to_time(hora_fin_maq)
+            except Exception:
+                # En caso de cualquier error, fallback a tratar como time strings
+                hora_inicio_maq_parsed = convert_to_time(hora_inicio_maq) if hora_inicio_maq else None
+                hora_fin_maq_parsed = convert_to_time(hora_fin_maq) if hora_fin_maq else None
 
             # ----------------------------------
             # VALIDACIÓN: sumar horas de actividades
@@ -798,6 +821,7 @@ def crear_turno_completo(request, pk=None):
                     turno.maquina = maquina
                     turno.tipo_turno = tipo_turno
                     turno.fecha = fecha
+                    turno.contrato = contrato_sondajes
                     turno.save()
                     # actualizar asociaciones many-to-many de sondajes
                     try:
@@ -821,9 +845,10 @@ def crear_turno_completo(request, pk=None):
                     TurnoCorrida.objects.filter(turno=turno).delete()
                     TurnoAvance.objects.filter(turno=turno).delete()
                 else:
-                    # Crear el turno principal
+                    # Crear el turno principal CON relación directa a contrato
                     turno = Turno.objects.create(
                         fecha=fecha,
+                        contrato=contrato_sondajes,
                         maquina=maquina,
                         tipo_turno=tipo_turno,
                     )
@@ -840,6 +865,7 @@ def crear_turno_completo(request, pk=None):
                 # en el POST
                 from decimal import Decimal
                 try:
+                    # Asegurar que los pares (sondaje_id, metraje) respeten el orden de selección
                     pairs = list(zip([int(s.id) for s in sondajes_list], metrajes_raw)) if metrajes_raw else []
                     objs = []
                     if pairs:
@@ -866,7 +892,7 @@ def crear_turno_completo(request, pk=None):
                     pass
 
                 # Crear TurnoMaquina si corresponde
-                if hora_inicio_maq_parsed or hora_fin_maq_parsed or request.POST.get('estado_bomba'):
+                if hora_inicio_maq_parsed or hora_fin_maq_parsed or horometro_inicio_val is not None or horometro_fin_val is not None or request.POST.get('estado_bomba'):
                     # Si estamos editando (pk) y existía un TurnoMaquina previo, restar sus horas del horometro
                     if pk:
                         prev_tm = TurnoMaquina.objects.filter(turno=turno).first()
@@ -882,6 +908,8 @@ def crear_turno_completo(request, pk=None):
                         turno=turno,
                         hora_inicio=hora_inicio_maq_parsed,
                         hora_fin=hora_fin_maq_parsed,
+                        horometro_inicio=horometro_inicio_val,
+                        horometro_fin=horometro_fin_val,
                         estado_bomba=request.POST.get('estado_bomba', 'OPERATIVO'),
                         estado_unidad=request.POST.get('estado_unidad', 'OPERATIVO'),
                         estado_rotacion=request.POST.get('estado_rotacion', 'OPERATIVO')
@@ -906,11 +934,16 @@ def crear_turno_completo(request, pk=None):
                         # No bloquear el flujo si hay problemas con el cálculo
                         pass
 
-                # Crear trabajadores
+                # Crear trabajadores: resolver por `dni` (la plantilla envía el dni como valor)
                 for t in trabajadores_parsed:
+                    try:
+                        trabajador_obj = Trabajador.objects.get(dni=str(t['trabajador_id']))
+                    except Trabajador.DoesNotExist:
+                        # Omitir si el trabajador no existe (no bloquear la transacción)
+                        continue
                     TurnoTrabajador.objects.create(
                         turno=turno,
-                        trabajador_id=t['trabajador_id'],
+                        trabajador=trabajador_obj,
                         funcion=t['funcion'],
                         observaciones=t['observaciones']
                     )
@@ -1015,9 +1048,10 @@ def crear_turno_completo(request, pk=None):
         turno = get_object_or_404(Turno, pk=pk)
         # preparar listas JSON para inyectar en template
         trabajadores = []
-        for tt in TurnoTrabajador.objects.filter(turno=turno):
+        for tt in TurnoTrabajador.objects.filter(turno=turno).select_related('trabajador'):
             trabajadores.append({
-                'trabajador_id': tt.trabajador_id,
+                # Serializar por DNI para que la plantilla pueda preseleccionar por value="dni"
+                'trabajador_id': getattr(tt.trabajador, 'dni', None),
                 'funcion': tt.funcion,
                 'observaciones': tt.observaciones,
             })
@@ -1074,6 +1108,41 @@ def crear_turno_completo(request, pk=None):
 
         # añadir datos al contexto serializados
         import json as _json
+        # Asegurar que el conjunto de tipos de actividad presente en la plantilla
+        # incluya las actividades ya asociadas al turno (si las hubiera). Esto
+        # evita que, al editar un turno, el <select> quede vacío si la actividad
+        # no está asignada al contrato actual.
+        try:
+            actividad_ids = [int(a['actividad_id']) for a in actividades if a.get('actividad_id')]
+            if actividad_ids:
+                extra_qs = TipoActividad.objects.filter(id__in=actividad_ids)
+                existing_qs = context.get('tipos_actividad')
+                try:
+                    context['tipos_actividad'] = (existing_qs | extra_qs).distinct()
+                except Exception:
+                    context['tipos_actividad'] = extra_qs
+        except Exception:
+            pass
+
+        # Cuando exista lectura de horómetro, exponerla; si no, usar hora ISO para prefill
+        _maquina_estado = getattr(turno, 'maquina_estado', None)
+        edit_h_ini = ''
+        edit_h_fin = ''
+        try:
+            if _maquina_estado and getattr(_maquina_estado, 'horometro_inicio', None) is not None:
+                edit_h_ini = str(_maquina_estado.horometro_inicio)
+            elif _maquina_estado and getattr(_maquina_estado, 'hora_inicio', None):
+                edit_h_ini = _maquina_estado.hora_inicio.isoformat()
+        except Exception:
+            edit_h_ini = ''
+        try:
+            if _maquina_estado and getattr(_maquina_estado, 'horometro_fin', None) is not None:
+                edit_h_fin = str(_maquina_estado.horometro_fin)
+            elif _maquina_estado and getattr(_maquina_estado, 'hora_fin', None):
+                edit_h_fin = _maquina_estado.hora_fin.isoformat()
+        except Exception:
+            edit_h_fin = ''
+
         context.update({
             'edit_mode': True,
             'edit_turno_id': turno.id,
@@ -1093,8 +1162,8 @@ def crear_turno_completo(request, pk=None):
             'edit_actividades_json': _json.dumps(actividades),
             'edit_corridas_json': _json.dumps(corridas),
             'edit_metros_perforados': metros,
-            'edit_hora_inicio_maq': getattr(getattr(turno, 'maquina_estado', None), 'hora_inicio', None).isoformat() if getattr(getattr(turno, 'maquina_estado', None), 'hora_inicio', None) else '',
-            'edit_hora_fin_maq': getattr(getattr(turno, 'maquina_estado', None), 'hora_fin', None).isoformat() if getattr(getattr(turno, 'maquina_estado', None), 'hora_fin', None) else '',
+            'edit_hora_inicio_maq': edit_h_ini,
+            'edit_hora_fin_maq': edit_h_fin,
             'edit_estado_bomba': getattr(getattr(turno, 'maquina_estado', None), 'estado_bomba', ''),
             'edit_estado_unidad': getattr(getattr(turno, 'maquina_estado', None), 'estado_unidad', ''),
             'edit_estado_rotacion': getattr(getattr(turno, 'maquina_estado', None), 'estado_rotacion', ''),
@@ -1242,6 +1311,10 @@ def listar_turnos(request):
     try:
         # TurnoAvance declara related_name='avance' en el modelo, es OneToOne -> usar select_related
         turnos = turnos.select_related('avance')
+        # Anotar avance_metros desde TurnoAvance para evitar errores cuando no exista la relación
+        from django.db.models import OuterRef, Subquery, DecimalField
+        avance_sq = TurnoAvance.objects.filter(turno=OuterRef('pk')).values('metros_perforados')[:1]
+        turnos = turnos.annotate(avance_metros=Subquery(avance_sq, output_field=DecimalField()))
     except Exception:
         # Si el nombre difiere en tu modelo, ignorar y continuar
         pass

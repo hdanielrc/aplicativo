@@ -12,7 +12,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 SECRET_KEY = env('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = env('DEBUG', default=True)
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1','homophonic-shan-unbroken.ngrok-free.dev'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # Permitir subdominios de ngrok en desarrollo para exponer el servidor local
 # de forma temporal. Esto solo se activa cuando DEBUG=True.
@@ -21,11 +21,11 @@ if DEBUG:
         ALLOWED_HOSTS.append('.ngrok.io')
 
 # Orígenes confiables para CSRF. Se puede ampliar desde .env si se desea.
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['http://localhost', 'http://127.0.0.1','http://homophonic-shan-unbroken.ngrok-free.dev'])
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['http://localhost', 'http://127.0.0.1'])
 if DEBUG:
     # Permitir orígenes https de ngrok (subdominios)
     if 'https://*.ngrok.io' not in CSRF_TRUSTED_ORIGINS:
-        CSRF_TRUSTED_ORIGINS.append('https://homophonic-shan-unbroken.ngrok-free.dev')
+        CSRF_TRUSTED_ORIGINS.append('https://*.ngrok.io')
 
 INSTALLED_APPS = [
     'django.contrib.admin',

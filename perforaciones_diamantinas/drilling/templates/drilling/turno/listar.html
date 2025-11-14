@@ -6,9 +6,14 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="fas fa-clock"></i> Gestión de Turnos</h2>
     {% if user.can_supervise_operations %}
-    <a href="{% url 'crear-turno-completo' %}" class="btn btn-primary">
-        <i class="fas fa-plus"></i> Nuevo Turno
-    </a>
+    <div class="btn-group" role="group">
+        <a href="{% url 'crear-turno-completo' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nuevo Turno
+        </a>
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalEditTurnoSelector">
+            <i class="fas fa-edit"></i> Editar Turno
+        </button>
+    </div>
     {% endif %}
 </div>
 
@@ -81,8 +86,14 @@
                             <br><small class="text-muted">{{ turno.fecha|date:"l" }}</small>
                         </td>
                         <td>
-                            <strong>{{ turno.sondaje.nombre_sondaje }}</strong>
-                            <br><small class="text-muted">{{ turno.sondaje.contrato.nombre_contrato }}</small>
+                            {% with s_list=turno.sondajes.all %}
+                                {% if s_list %}
+                                    <strong>{{ s_list.0.nombre_sondaje }}</strong>
+                                    <br><small class="text-muted">{{ s_list.0.contrato.nombre_contrato }}</small>
+                                {% else %}
+                                    <small class="text-muted">Sin sondaje</small>
+                                {% endif %}
+                            {% endwith %}
                         </td>
                         <td>
                             {{ turno.maquina.nombre }}
@@ -92,23 +103,23 @@
                             <span class="badge bg-info">{{ turno.tipo_turno.nombre }}</span>
                         </td>
                         <td>
-                            {% if turno.trabajadores_turno.all %}
-                                {% for trabajador_turno in turno.trabajadores_turno.all %}
-                                    <small>
-                                        {{ trabajador_turno.trabajador.apellidos }}, {{ trabajador_turno.trabajador.nombres }}
-                                        {% if trabajador_turno.trabajador.dni %} - {{ trabajador_turno.trabajador.dni }}{% endif %}
-                                        ({{ trabajador_turno.get_funcion_display|default:trabajador_turno.funcion }})
-                                    </small><br>
-                                {% endfor %}
-                            {% else %}
-                                <small class="text-muted">Sin trabajadores</small>
-                            {% endif %}
+                            {% with t_list=turno.trabajadores_turno.all %}
+                                {% if t_list %}
+                                    {% for trabajador_turno in t_list %}
+                                        <small>
+                                            {{ trabajador_turno.trabajador.apellidos }}, {{ trabajador_turno.trabajador.nombres }}
+                                            {% if trabajador_turno.trabajador.dni %} - {{ trabajador_turno.trabajador.dni }}{% endif %}
+                                            ({{ trabajador_turno.get_funcion_display|default:trabajador_turno.funcion }})
+                                        </small><br>
+                                    {% endfor %}
+                                {% else %}
+                                    <small class="text-muted">Sin trabajadores</small>
+                                {% endif %}
+                            {% endwith %}
                         </td>
                         <td>
-                            {% if turno.turnoavance_set.first %}
-                                <span class="badge bg-success">
-                                    {{ turno.turnoavance_set.first.metros_perforados }}m
-                                </span>
+                            {% if turno.avance_metros %}
+                                <span class="badge bg-success">{{ turno.avance_metros|floatformat:2 }}m</span>
                             {% else %}
                                 <span class="badge bg-secondary">0m</span>
                             {% endif %}
@@ -120,13 +131,10 @@
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-outline-info" 
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#modalDetalles{{ turno.id }}"
-                                        title="Ver detalles">
+                                <a href="{% url 'turno-detail' turno.id %}" class="btn btn-outline-info" target="_blank" title="Ver detalles">
                                     <i class="fas fa-eye"></i>
-                                </button>
-                                {% if user.is_system_admin or user.role == 'SUPERVISOR' %}
+                                </a>
+                                {% if user.can_supervise_operations %}
                                 <a href="{% url 'editar-turno-completo' turno.id %}" class="btn btn-outline-primary" title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
@@ -143,141 +151,7 @@
                         </td>
                     </tr>
 
-                    <!-- Modal de detalles del turno -->
-                    <div class="modal fade" id="modalDetalles{{ turno.id }}" tabindex="-1">
-                        <div class="modal-dialog modal-lg">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">
-                                        <i class="fas fa-info-circle"></i> 
-                                        Detalles del Turno #{{ turno.id }}
-                                    </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <h6><i class="fas fa-calendar"></i> Información Básica</h6>
-                                            <ul class="list-unstyled">
-                                                <li><strong>Fecha:</strong> {{ turno.fecha|date:"d/m/Y" }}</li>
-                                                <li><strong>Sondaje:</strong> {{ turno.sondaje.nombre_sondaje }}</li>
-                                                <li><strong>Máquina:</strong> {{ turno.maquina.nombre }}</li>
-                                                <li><strong>Tipo:</strong> {{ turno.tipo_turno.nombre }}</li>
-                                            </ul>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <h6><i class="fas fa-chart-line"></i> Avance</h6>
-                                            {% if turno.turnoavance_set.first %}
-                                                <p><strong>Metros perforados:</strong> 
-                                                   {{ turno.turnoavance_set.first.metros_perforados }}m</p>
-                                            {% else %}
-                                                <p class="text-muted">Sin avance registrado</p>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-
-                                    <!-- Trabajadores -->
-                                    <h6><i class="fas fa-users"></i> Trabajadores</h6>
-                                    {% if turno.turnotrabajador_set.all %}
-                                        <div class="table-responsive">
-                                            <table class="table table-sm">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Nombre</th>
-                                                        <th>Función</th>
-                                                        <th>Observaciones</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for trabajador_turno in turno.turnotrabajador_set.all %}
-                                                    <tr>
-                                                        <td>{{ trabajador_turno.trabajador.apellidos }}, {{ trabajador_turno.trabajador.nombres }}{% if trabajador_turno.trabajador.dni %} - {{ trabajador_turno.trabajador.dni }}{% endif %}</td>
-                                                        <td>{{ trabajador_turno.get_funcion_display|default:trabajador_turno.funcion }}</td>
-                                                        <td>{{ trabajador_turno.observaciones|default:"-" }}</td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    {% else %}
-                                        <p class="text-muted">Sin trabajadores asignados</p>
-                                    {% endif %}
-
-                                    <!-- Complementos -->
-                                    {% if turno.turnocomplemento_set.all %}
-                                    <h6><i class="fas fa-puzzle-piece"></i> Complementos</h6>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th>Tipo</th>
-                                                    <th>Serie</th>
-                                                    <th>Desde</th>
-                                                    <th>Hasta</th>
-                                                    <th>Diferencia</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for complemento in turno.turnocomplemento_set.all %}
-                                                <tr>
-                                                    <td>{{ complemento.tipo_complemento.nombre }}</td>
-                                                    <td>{{ complemento.codigo_serie }}</td>
-                                                    <td>{{ complemento.metros_inicio }}m</td>
-                                                    <td>{{ complemento.metros_fin }}m</td>
-                                                    <td>
-                                                        {% widthratio complemento.metros_fin 1 1 as fin %}
-                                                        {% widthratio complemento.metros_inicio 1 1 as inicio %}
-                                                        {{ fin|floatformat:1 }}m - {{ inicio|floatformat:1 }}m
-                                                    </td>
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    {% endif %}
-
-                                    <!-- Corridas -->
-                                    {% if turno.turnocorrida_set.all %}
-                                    <h6><i class="fas fa-route"></i> Corridas</h6>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Desde</th>
-                                                    <th>Hasta</th>
-                                                    <th>Recuperación</th>
-                                                    <th>Litología</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for corrida in turno.turnocorrida_set.all %}
-                                                <tr>
-                                                    <td>{{ corrida.corrida_numero }}</td>
-                                                    <td>{{ corrida.desde }}m</td>
-                                                    <td>{{ corrida.hasta }}m</td>
-                                                    <td>{{ corrida.pct_recuperacion }}%</td>
-                                                    <td>{{ corrida.litologia|truncatechars:30 }}</td>
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                        <i class="fas fa-times"></i> Cerrar
-                                    </button>
-                                    {% if user.can_supervise_operations %}
-                                    <a href="{% url 'editar-turno-completo' turno.id %}" class="btn btn-primary">
-                                        <i class="fas fa-edit"></i> Editar Turno
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Removed per-row modal (uses detail page instead to avoid modal movement issues) -->
                     
                     {% empty %}
                     <tr>
@@ -363,4 +237,40 @@
         </div>
     </div>
 </div>
+<!-- Modal selector para editar turno por ID -->
+{% if user.can_supervise_operations %}
+<div class="modal fade" id="modalEditTurnoSelector" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Turno</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEditTurnoSelector" class="modal-body">
+                <div class="mb-3">
+                    <label for="editTurnoId" class="form-label">ID del Turno</label>
+                    <input type="number" id="editTurnoId" class="form-control" min="1" required>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Ir a editar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.getElementById('formEditTurnoSelector');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var id = document.getElementById('editTurnoId').value;
+        if (!id) return;
+        // Redirect to the editar-turno-completo URL pattern: /turno/<id>/editar_completo/
+        window.location.href = '/turno/' + encodeURIComponent(id) + '/editar_completo/';
+    });
+});
+</script>
+{% endif %}
 {% endblock %}
