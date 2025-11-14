@@ -1,0 +1,112 @@
+.venv/
+venv/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+eggs/
+parts/
+sdist/
+var/
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+htmlcov/
+
+# Translations
+*.mo
+
+# Django stuff:
+# (do not ignore migrations unless you intentionally want them out of the repo)
+# SQLite database
+*.sqlite3
+
+# Env files
+.env
+.env.*
+env/
+
+# Virtualenv
+venv/
+.venv/
+ENV/
+env.bak/
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer/IDE related
+.idea/
+.vscode/
+.project
+.classpath
+.settings/
+
+# JetBrains
+*.iml
+
+# VS Code
+.history/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# Coverage and test reports
+.pytest_cache/
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+
+# Python virtual environment artifacts sometimes left in repo
+pip-selfcheck.json
+
+# mypy
+.mypy_cache/
+
+# pyre
+.pyre/
+
+# profiler
+profiler.out
+
+# End of file
