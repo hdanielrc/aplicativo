@@ -976,61 +976,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // MEJORAS DE EXPERIENCIA DE USUARIO
     // =============================================
     
-<<<<<<< HEAD
-    document.getElementById('form-turno').addEventListener('submit', function(e) {
-        // Validación cliente: horómetro numeric y horómetro fin >= inicio
-        try {
-            const hIniEl = document.getElementById('hora_inicio_maq');
-            const hFinEl = document.getElementById('hora_fin_maq');
-            if (hIniEl && hFinEl) {
-                const hi = hIniEl.value;
-                const hf = hFinEl.value;
-                if (hi !== '' && hf !== '') {
-                    const hiNum = parseFloat(hi);
-                    const hfNum = parseFloat(hf);
-                    if (isNaN(hiNum) || isNaN(hfNum)) {
-                        e.preventDefault();
-                        alert('Por favor ingrese valores numéricos válidos para Horómetro Inicio/Fin.');
-                        return;
-                    }
-                    if (hfNum < hiNum) {
-                        e.preventDefault();
-                        alert('Horómetro Fin debe ser mayor o igual que Horómetro Inicio.');
-                        return;
-                    }
-                }
-            }
-        } catch (err) {
-            console.warn('Validación de horómetro falló:', err);
-        }
-        // VALIDACIÓN: para cada sondaje que tenga complementos o aditivos, exigir metraje > 0
-        try {
-            const sondajeRows = Array.from(document.querySelectorAll('.sondaje-row'));
-            for (const row of sondajeRows) {
-                const sel = row.querySelector('select[name="sondajes"]');
-                const metInput = row.querySelector('input[name="sondajes_metraje"]');
-                const sondajeId = sel ? sel.value : null;
-                const sondajeText = sel ? (sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '') : '';
-                if (!sondajeId) continue; // saltar filas vacías
-
-                // comprobar si existen complementos/aditivos para este sondaje
-                const compSub = document.querySelector('.complemento-subsection[data-sondaje-id="' + sondajeId + '"]');
-                const aditSub = document.querySelector('.aditivo-subsection[data-sondaje-id="' + sondajeId + '"]');
-                const hasComp = compSub && compSub.querySelector('.complemento-row');
-                const hasAdit = aditSub && aditSub.querySelector('.aditivo-row');
-                if ((hasComp || hasAdit)) {
-                    const metVal = metInput ? metInput.value : '';
-                    if (metVal === '' || isNaN(parseFloat(metVal)) || parseFloat(metVal) <= 0) {
-                        e.preventDefault();
-                        alert('El sondaje "' + (sondajeText || sondajeId) + '" tiene productos diamantados/aditivos asociados pero no tiene metraje válido. Por favor indique el metraje (mayor que 0) en esa fila antes de guardar.');
-                        return;
-                    }
-                }
-            }
-        } catch (err) {
-            // Si la validación falla por algún motivo, no bloquear el envío (pero loguear)
-            console.warn('Validación de metraje por sondaje falló:', err);
-=======
     // Autocompletado de horas basado en tipo de turno
     document.getElementById('tipo_turno').addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
@@ -1049,7 +994,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (tipoNombre.includes('madrugada') || tipoNombre.includes('alba')) {
             horaInicio = '00:00';
             horaFin = '08:00';
->>>>>>> fc011520ef52199e78893d0be57e43170ca8db4d
         }
 
         if (horaInicio && horaFin) {
@@ -1415,6 +1359,65 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Inicializar mejoras UX
     agregarTooltips();
+
+    // =============================================
+    // VALIDACIONES DEL FORMULARIO
+    // =============================================
+    
+    document.getElementById('form-turno').addEventListener('submit', function(e) {
+        // Validación cliente: horómetro numeric y horómetro fin >= inicio
+        try {
+            const hIniEl = document.getElementById('hora_inicio_maq');
+            const hFinEl = document.getElementById('hora_fin_maq');
+            if (hIniEl && hFinEl) {
+                const hi = hIniEl.value;
+                const hf = hFinEl.value;
+                if (hi !== '' && hf !== '') {
+                    const hiNum = parseFloat(hi);
+                    const hfNum = parseFloat(hf);
+                    if (isNaN(hiNum) || isNaN(hfNum)) {
+                        e.preventDefault();
+                        alert('Por favor ingrese valores numéricos válidos para Horómetro Inicio/Fin.');
+                        return;
+                    }
+                    if (hfNum < hiNum) {
+                        e.preventDefault();
+                        alert('Horómetro Fin debe ser mayor o igual que Horómetro Inicio.');
+                        return;
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('Validación de horómetro falló:', err);
+        }
+        // VALIDACIÓN: para cada sondaje que tenga complementos o aditivos, exigir metraje > 0
+        try {
+            const sondajeRows = Array.from(document.querySelectorAll('.sondaje-row'));
+            for (const row of sondajeRows) {
+                const sel = row.querySelector('select[name="sondajes"]');
+                const metInput = row.querySelector('input[name="sondajes_metraje"]');
+                const sondajeId = sel ? sel.value : null;
+                const sondajeText = sel ? (sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '') : '';
+                if (!sondajeId) continue; // saltar filas vacías
+
+                // comprobar si existen complementos/aditivos para este sondaje
+                const compSub = document.querySelector('.complemento-subsection[data-sondaje-id="' + sondajeId + '"]');
+                const aditSub = document.querySelector('.aditivo-subsection[data-sondaje-id="' + sondajeId + '"]');
+                const hasComp = compSub && compSub.querySelector('.complemento-row');
+                const hasAdit = aditSub && aditSub.querySelector('.aditivo-row');
+                if ((hasComp || hasAdit)) {
+                    const metVal = metInput ? metInput.value : '';
+                    if (metVal === '' || isNaN(parseFloat(metVal)) || parseFloat(metVal) <= 0) {
+                        e.preventDefault();
+                        alert('El sondaje "' + (sondajeText || sondajeId) + '" tiene productos diamantados/aditivos asociados pero no tiene metraje válido. Por favor indique el metraje (mayor que 0) en esa fila antes de guardar.');
+                        return;
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('Validación de metraje por sondaje falló:', err);
+        }
+    });
 });
 </script>
 {% endblock %}
